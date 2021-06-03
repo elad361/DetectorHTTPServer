@@ -67,7 +67,7 @@ static void ev_handler(struct mg_connection* nc, int ev, void* p) {
 		std::vector<AnomalyReport> v = detector->detect(ts);
 		string s;
 		convertVecrtorToJASON(v, s);
-		mg_printf(nc, s.c_str(), sizeof(v));
+		mg_printf(nc, s.c_str());
 		delete detector;
 		//mg_serve_http(nc, (struct http_message*) p, s_http_server_opts);
 	}
