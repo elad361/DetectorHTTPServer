@@ -2,7 +2,7 @@
 #include <iostream>
 #include <thread>
 #include <sstream>
-#include "mongoose.h"
+#include "mongoose/mongoose.h"
 #include "detectorFiles/SimpleAnomalyDetector.h"
 #include "detectorFiles/HybridAnomalyDetector.h"
 #include "detectorFiles/timeseries.h"
@@ -40,8 +40,8 @@ void convertVecrtorToJASON(std::vector<AnomalyReport>& reports, string& s) {
 	json << "[" << endl;
 	for (AnomalyReport report : reports) {
 		json << " {" << std::endl;
-		json << "  \"timeStep\":" << report.timeStep << "," << endl;
-		json << "  \"columns\":" << report.description << endl;
+		json << "  \"timeStep\":\"" << report.timeStep << "\"" << "," << endl;
+		json << "  \"columns\":\"" << report.description << "\"" << endl;
 		json << " }," << endl;
 	}
 	json << "];";
