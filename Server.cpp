@@ -51,7 +51,7 @@ void convertVecrtorToJASON(std::vector<AnomalyReport>& reports, string& s) {
 static void ev_handler(struct mg_connection* nc, int ev, void* p) {
 	
 	if (ev == MG_EV_HTTP_REQUEST) {
-		Files files = extractData(nc->recv_mbuf.buf);
+		Files files = extractData(nc->recv_mbuf.buf,nc->recv_mbuf.len);
 		TimeSeriesAnomalyDetector* detector;
 		if (files.algo.compare("hybrid")) {
 			detector = new HybridAnomalyDetector();
