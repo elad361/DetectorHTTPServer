@@ -29,13 +29,16 @@ Files extractData(char* buf) {
 std::string convertVecrtorToJASON(std::vector<AnomalyReport>& reports) {
 	std::stringstream json;
 	json << "[" << endl;
-	for (AnomalyReport report : reports) {
-		json << " {" << std::endl;
-		json << "  \"timeStep\":" << "\"" << report.timeStep << "\"," << endl;
-		json << "  \"columns\":" << "\"" << report.description << "\"" << endl;
-		json << " }," << endl;
+	for (auto it = reports.begin(); it < reports.end(); ++it) {
+		json << "	{" << std::endl;
+		json << "		\"timeStep\":" << it->timeStep<< "," <<  endl;
+		json << "		\"columns\":" << "\"" << it->description << "\"" << endl;
+		json << "	}";
+		if (it < reports.end() - 1) { json << ","; }
+		json << endl;
 	}
-	json << "];";
+	json << "]";
+	cout << json.str() << endl;
 	return json.str();
 }
 
@@ -64,7 +67,6 @@ static void ev_handler(struct mg_connection* nc, int ev, void* p) {
 		string s = convertVecrtorToJASON(v);
 		cout << "Sent now" << endl;
 		struct http_message* hm = (struct http_message*)p;
-		cout << s << endl;
 		mg_printf(nc, "HTTP/1.1 200 OK\r\nContent-Type: "
 			"application/json\r\nContent-Length: %d\r\n\r\n%s",
 			(int)strlen(s.c_str()), s.c_str());
