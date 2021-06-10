@@ -1,4 +1,4 @@
-
+#define _CRT_SECURE_NO_WARNINGS
 #include <string>
 #include <cstring>
 #include <iostream>
@@ -12,85 +12,41 @@
 static struct mg_serve_http_opts s_http_server_opts;
 using namespace std;
 
-static int mg_http_get_request_len(const char* s, int buf_len);
-
 struct Files {
 	std::string file1;
 	std::string file2;
 	std::string algo;
-	int size;
 };
 
-Files extractData(const char* buf, size_t size) {
+Files extractData(char* buf) {
 	Files files;
-	std::stringstream s;
-	s << buf;
-	string line;
-	for (int i = 0; i < 8; i++) {
-		std::getline(s, line);
-		if (i == 5) {
-			files.size = stoi(line.substr(line.find(': '), line.length()));
-		}
-	}
-	string line2;
-	line = "";
-	while (getline(s, line2))
-	{
-		line += line2;
-	}
-	line = s.str();
-	string st = line.substr(mg_http_get_request_len(buf, size), files.size);
-	std::stringstream newS(st.substr(0, files.size));
-	//strtok data
-	//char* copyOfData;
-	//strcpy(copyOfData,newS.c_str());
-	//char* pch;
-	////char args[3];
-	//pch = strtok(copyOfData, ":");
-	//int i = 0;
-	//while (pch != NULL)
-	//{
-	//	//args[i] = pch;
-	//	pch = strtok(NULL, ":");
-	//	i++;
-	//}
-	st = "";
-	getline(newS, st);
-	while (!st.compare("\n"))
-	{
-		files.file1 += st;
-		getline(newS, st);
-	}
-
-	getline(newS, st);
-	getline(newS, st);
-	while (!st.compare("\n"))
-	{
-		files.file2 += st;
-		getline(newS, st);
-	}
-	getline(newS, st);
-	getline(newS, files.algo);
+	files.file1 = strtok(buf, "*");
+	files.file2 = strtok(NULL, "*");
+	files.algo = strtok(NULL, "*");
 	return files;
 }
 
-void convertVecrtorToJASON(std::vector<AnomalyReport>& reports, string& s) {
+std::string convertVecrtorToJASON(std::vector<AnomalyReport>& reports) {
 	std::stringstream json;
 	json << "[" << endl;
 	for (AnomalyReport report : reports) {
 		json << " {" << std::endl;
-		json << "  \"timeStep\":" << report.timeStep << "," << endl;
-		json << "  \"columns\":" << report.description << endl;
+		json << "  \"timeStep\":" << "\"" << report.timeStep << "\"," << endl;
+		json << "  \"columns\":" << "\"" << report.description << "\"" << endl;
 		json << " }," << endl;
 	}
 	json << "];";
-	s = json.str();
+	return json.str();
 }
 
 static void ev_handler(struct mg_connection* nc, int ev, void* p) {
 
 	if (ev == MG_EV_HTTP_REQUEST) {
-		Files files = extractData(nc->recv_mbuf.buf, nc->recv_mbuf.len);
+		struct http_message* test = (struct http_message*)p;
+		char* data = new char[strlen((test->body.p)) + 1];
+		strcpy(data, test->body.p);
+		Files files = extractData(data);
+
 		TimeSeriesAnomalyDetector* detector;
 		if (files.algo.compare("hybrid")) {
 			detector = new HybridAnomalyDetector();
@@ -100,20 +56,21 @@ static void ev_handler(struct mg_connection* nc, int ev, void* p) {
 		}
 		std::thread l([files, detector]() -> void {
 			TimeSeries t(files.file1.c_str());
-			cout << "file1: " << files.file1.c_str() << endl;
 			detector->learnNormal(t); });
 		TimeSeries ts(files.file2.c_str());
 		l.join();
 		std::vector<AnomalyReport> v = detector->detect(ts);
-		string s;
-		convertVecrtorToJASON(v, s);
-		struct http_message* hm = (struct http_message*) p;
 
-		hm->message.p = s.c_str();
-		hm->message.len = s.length();
-		mg_serve_http(nc, hm , s_http_server_opts);
+		string s = convertVecrtorToJASON(v);
+		cout << "Sent now" << endl;
+		struct http_message* hm = (struct http_message*)p;
+		cout << s << endl;
+		mg_printf(nc, "HTTP/1.1 200 OK\r\nContent-Type: "
+			"application/json\r\nContent-Length: %d\r\n\r\n%s",
+			(int)strlen(s.c_str()), s.c_str());
+
+		delete[] data;
 		delete detector;
-		//mg_serve_http(nc, (struct http_message*) p, s_http_server_opts);
 	}
 }
 
@@ -150,5 +107,3 @@ int main(void) {
 	initServer(port);
 	return 0;
 }
-
-
