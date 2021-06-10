@@ -1,36 +1,21 @@
-//Author: Elad Shoham 205439649
+//Elad Shoham 205439649
+#include "HybridAnomalyDetector.h"
 
-#include "SimpleAnomalyDetector.h"
+HybridAnomalyDetector::~HybridAnomalyDetector() { }
 
-SimpleAnomalyDetector::~SimpleAnomalyDetector() { }
-
-void SimpleAnomalyDetector::learnNormal(const TimeSeries& ts)
-{
-	vector<std::string> features = ts.getFeatures();
-	int size = ts.getSize();
-	for (auto it = features.begin(); it != features.end(); ++it)
-	{
-		for (auto it2 = it + 1; it2 < features.end(); ++it2)
-		{
-			checkCorrlation(*it, *it2, ts);
-		}
-	}
+void HybridAnomalyDetector::updateMinCircleCorrelatedFeatures(float corr, std::string f1, std::string f2, const TimeSeries& ts, std::vector<Point*>& v) {
+	correlatedFeatures circle;
+	circle.corrlation = corr;
+	circle.feature1 = f1;
+	circle.feature2 = f2;
+	circle.isACircle = 1;
+	Circle c = findMinCircle(v.data(), ts.getSize());
+	circle.threshold = c.radius * 1.1;
+	circle.x = c.center.x;
+	cf.push_back(circle);
 }
 
-vector<AnomalyReport> SimpleAnomalyDetector::detect(const TimeSeries& ts) {
-	vector<AnomalyReport> v;
-	for (auto it = cf.begin(); it < cf.end(); ++it) {
-		std::vector<Point*> points;
-		ts.putPointsIntoVector(it->feature1, it->feature2, points);
-		checkAnomalies(points, *it, v);
-		for (auto it2 = points.begin(); it2 < points.end(); ++it2) {
-			delete* it2;
-		}
-	}
-	return v;
-}
-
-void SimpleAnomalyDetector::checkCorrlation(std::string f1, std::string f2, const TimeSeries& ts) {
+void HybridAnomalyDetector::checkCorrlation(std::string f1, std::string f2, const TimeSeries& ts) {
 	float corr = pearson(ts.getFeatureVals(f1).data(), ts.getFeatureVals(f2).data(), ts.getSize());
 	if (abs(corr) >= threshold) {
 		vector<Point*> v;
@@ -40,36 +25,31 @@ void SimpleAnomalyDetector::checkCorrlation(std::string f1, std::string f2, cons
 			delete* it;
 		}
 	}
-}
-
-void SimpleAnomalyDetector::updateRegCorrelatedFeatures(float corr, std::string f1, std::string f2, const TimeSeries& ts, std::vector<Point*>& v) {
-	correlatedFeatures reg;
-	reg.corrlation = corr;
-	reg.feature1 = f1;
-	reg.feature2 = f2;
-	reg.isACircle = 0;
-	reg.threshold = 0;
-	reg.lin_reg = linear_reg(v.data(), ts.getSize());
-	for (auto it = v.begin(); it < v.end(); ++it) {
-		float d = dev(**it, reg.lin_reg);
-		if (d > reg.threshold) {
-			reg.threshold = d;
+	else if (abs(corr) > 0.5) {
+		vector<Point*> v;
+		ts.putPointsIntoVector(f1, f2, v);
+		updateMinCircleCorrelatedFeatures(corr, f1, f2, ts, v);
+		for (auto it = v.begin(); it < v.end(); ++it) {
+			delete* it;
 		}
 	}
-	reg.threshold *= 1.1;
-	cf.push_back(reg);
 }
 
-void SimpleAnomalyDetector::findAnomaliesByLine(vector<Point*>& v, correlatedFeatures& corrf, vector<AnomalyReport>& ar) {
+void HybridAnomalyDetector::checkAnomalies(vector<Point*>& v, correlatedFeatures& corrf, vector<AnomalyReport>& ar) {
+	if (corrf.isACircle) { findAnomaliesByMinCircle(v, corrf, ar); }
+	else { findAnomaliesByLine(v, corrf, ar); }
+}
+
+void HybridAnomalyDetector::findAnomaliesByMinCircle(vector<Point*>& v, correlatedFeatures& corrf, vector<AnomalyReport>& ar) {
 	for (auto it = v.begin(); it < v.end(); ++it) {
-		float d = dev(**it, corrf.lin_reg);
-		if (d > corrf.threshold) {
-			AnomalyReport report(corrf.feature1 + '-' + corrf.feature2, it - v.begin() + 1);
+		Point p(corrf.x, corrf.y);
+		if (dis(**it, p) > corrf.threshold) {
+			AnomalyReport report(corrf.feature1 + '-' + corrf.feature2.substr(0, corrf.feature2.find("\r")), it - v.begin() + 1);
 			ar.push_back(report);
 		}
 	}
 }
 
-void SimpleAnomalyDetector::checkAnomalies(vector<Point*>& v, correlatedFeatures& corrf, vector<AnomalyReport>& ar) {
-	findAnomaliesByLine(v, corrf, ar);
+float dis(Point p1, Point p2) {
+	return sqrt(pow(p2.x - p1.x, 2) + pow(p2.y - p1.y, 2));
 }
