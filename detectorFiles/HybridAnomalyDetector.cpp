@@ -44,7 +44,7 @@ void HybridAnomalyDetector::findAnomaliesByMinCircle(vector<Point*>& v, correlat
 	for (auto it = v.begin(); it < v.end(); ++it) {
 		Point p(corrf.x, corrf.y);
 		if (dis(**it, p) > corrf.threshold) {
-			AnomalyReport report(corrf.feature1 + '-' + corrf.feature2, it - v.begin() + 1);
+			AnomalyReport report(corrf.feature1 + '-' + corrf.feature2.substr(0, corrf.feature2.find("\r")), it - v.begin() + 1);
 			ar.push_back(report);
 		}
 	}
